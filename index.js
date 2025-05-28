@@ -75,25 +75,30 @@ function inputHandler(event) {
   } else if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
     const move = {from: event.squareFrom, to: event.squareTo, promotion: event.promotion}
     console.log(puzzle.moves[moveIndex], move)
-    if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to) {
-      drawCorrectnessMoveIndicator(move.from, false)
-      return
-    } else {
-      drawCorrectnessMoveIndicator(move.to, true)
-    }
 
     const result = chess.move(move)
     if (result) {
-      moveIndex++
       event.chessboard.state.moveInputProcess.then(() => { // wait for the move input process has finished
         event.chessboard.setPosition(chess.fen(), true).then(() => { // update position, maybe castled and wait for animation has finished
-          if (puzzle.moves.length === moveIndex) {
-            alert('Success!')
-            return
-          }
 
-          // makeEngineMove(event.chessboard)
-          makePuzzleMove(event.chessboard)
+            if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to) {
+              drawCorrectnessMoveIndicator(move.to, false)
+              setTimeout(() => {
+                chess.undo()
+                document.querySelector( '#crossmark').style.opacity = 0;
+                event.chessboard.setPosition(chess.fen(), true)
+                event.chessboard.enableMoveInput(inputHandler, puzzleColor)
+              }, 500)
+              // return
+            } else {
+              moveIndex++
+              drawCorrectnessMoveIndicator(move.to, true)
+              makePuzzleMove(event.chessboard)
+              if (puzzle.moves.length === moveIndex) {
+                alert('Success!')
+                return
+              }
+            }
         })
       })
     } else {

@@ -6,4 +6,5 @@ body {
 #checkmark, #crossmark {
   position: absolute;
   opacity: 0;
+  user-select: none;
 }
