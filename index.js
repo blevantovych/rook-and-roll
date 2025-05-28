@@ -2,7 +2,6 @@ import {Chess} from "https://cdn.jsdelivr.net/npm/chess.mjs@1.2.0/src/chess.mjs/
 
 import {
   Chessboard,
-  FEN,
   INPUT_EVENT_TYPE,
   COLOR, 
   BORDER_TYPE
@@ -49,6 +48,16 @@ function makePuzzleMove(chessboard) {
   // }
 }
 
+function drawCorrectnessMoveIndicator(move, correct) {
+    const element = document.querySelector(`[data-square="${move}"]`)
+    const boundingBox = element.getBoundingClientRect()
+    document.querySelector(correct ? '#crossmark' : '#checkmark').style.opacity = 0;
+    const selector = correct ? '#checkmark' : '#crossmark'
+    const emoji = document.querySelector(selector)
+    emoji.style.left = boundingBox.x + 30;
+    emoji.style.top = boundingBox.y + 30;
+    emoji.style.opacity = 1
+}
 
 function inputHandler(event) {
   console.log("inputHandler", event)
@@ -67,8 +76,10 @@ function inputHandler(event) {
     const move = {from: event.squareFrom, to: event.squareTo, promotion: event.promotion}
     console.log(puzzle.moves[moveIndex], move)
     if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to) {
-      alert('Wrong move!')
+      drawCorrectnessMoveIndicator(move.from, false)
       return
+    } else {
+      drawCorrectnessMoveIndicator(move.to, true)
     }
 
     const result = chess.move(move)

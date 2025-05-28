@@ -2,3 +2,8 @@ body {
   display: grid;
   place-items: center;
 }
+
+#checkmark, #crossmark {
+  position: absolute;
+  opacity: 0;
+}
