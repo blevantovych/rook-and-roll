@@ -14,7 +14,8 @@ import {Accessibility} from "https://cdn.jsdelivr.net/npm/cm-chessboard@8/src/ex
 let boardIndex = 0;
 
 function fetchPuzzles() {
-  const eventName = 'Rated blitz game';
+  const eventName = 'Українська ліга 226 Team Battle';
+  // const eventName = 'Rated blitz game';
   return fetch(`https://amxmp30651.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(eventName)}`)
     .then(res => res.json())
 }
@@ -32,7 +33,8 @@ function renderBoard(puzzleInput) {
     <div id="crossmark">❌</div>
     <div>${puzzleInput}</div>
   `
-  document.body.appendChild(boardContainer)
+
+  puzzle_container.appendChild(boardContainer)
   let moveIndex = 0
 
   function makePuzzleMove(chessboard) {
@@ -172,9 +174,13 @@ function renderBoard(puzzleInput) {
   }, 1000)
 }
 
-fetchPuzzles().then(puzzles => {
-  puzzles.forEach(({Puzzle}) => {
-    renderBoard(Puzzle)
-  })
-})
+let puzzleIndex = 0
+const puzzles = await fetchPuzzles()
 
+const p = puzzles[0].Puzzle
+renderBoard(p)
+next_button.addEventListener('click', function() {
+  const p = puzzles[++puzzleIndex].Puzzle
+  puzzle_container.innerHTML = ''
+  renderBoard(p)
+})
