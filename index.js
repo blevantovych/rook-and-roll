@@ -1,4 +1,4 @@
-import {Chess} from "https://cdn.jsdelivr.net/npm/chess.mjs@1.2.0/src/chess.mjs/Chess.js"
+import {Chess} from "https://cdn.jsdelivr.net/npm/chess.mjs@1.3.1/src/chess.mjs/Chess.js"
 
 import {
   Chessboard,
@@ -13,14 +13,54 @@ import {Accessibility} from "https://cdn.jsdelivr.net/npm/cm-chessboard@8/src/ex
 
 let boardIndex = 0;
 
+/**
+  * @param puzzles {Array<{Puzzle: string}>}
+  * @param solvedPuzzles {Array<string>}
+  * @param {number} [puzzleIndex=0]
+  * @returns {number} the index of the next puzzle to show
+*/
+const getPuzzleIndex = (puzzles, solvedPuzzles, puzzleIndex = 0) => {
+  console.log({ puzzles: puzzles.slice(0, 100), solvedPuzzles, puzzleIndex });
+ return puzzles.findIndex(({ Puzzle }, i) => i > puzzleIndex && !solvedPuzzles.includes(Puzzle))
+}
+
+/**
+  * @returns {Array<string>} list of solved puzzles in the form: ["1Q3r2/p5pk/8/2p3q1/p5p1/2B5/6PK/8 w - - 0 51,b8f8 g5h6 h2g3 h6e3 g3g4 e3c3 f8f5 g7g6"]
+*/
+const getSolvedPuzzles = () => {
+  const solvedPuzzles = localStorage.getItem('solved_puzzles') ? JSON.parse(localStorage.getItem('solved_puzzles')) : []
+  return solvedPuzzles;
+}
+
+const addToSolvedPuzzles = (puzzle) => {
+  const solvedPuzzles = getSolvedPuzzles()
+  localStorage.setItem('solved_puzzles', JSON.stringify([...solvedPuzzles, puzzle]))
+}
+
+const getMoveThatThisOldChessjsVersionUnderstands = move => {
+  const promotion = move.slice(4)
+  return {
+    from: move.slice(0, 2),
+    to: move.slice(2, 4),
+    ...(promotion ? {promotion} : {})
+  }
+}
+
+/**
+ * Gets puzzles from DB
+ *
+ * @returns {{ Black: string, CombinedElo: string, DateTime: string, Event: string, Puzzle: string, Site: string, White: string }[]} user - The user object.
+ */
 function fetchPuzzles() {
-  const eventName = 'Українська ліга 226 Team Battle';
+  // const eventName = 'Українська ліга 226 Team Battle';
+  // const eventName = 'Українська ліга 243 Team Battle';
+  const eventName = 'Titled-Tuesday-Blitz-October-07-2025';
   // const eventName = 'Rated blitz game';
   return fetch(`https://amxmp30651.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(eventName)}`)
     .then(res => res.json())
 }
 
-function renderBoard(puzzleInput) {
+function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   const chess = new Chess()
   const boardContainer = document.createElement('div')
   const boardId = `board${boardIndex++}`
@@ -31,7 +71,8 @@ function renderBoard(puzzleInput) {
     <div id="${boardId}" style="width:400px"></div>
     <div id="checkmark">✅</div>
     <div id="crossmark">❌</div>
-    <div>${puzzleInput}</div>
+    <div id="players" style="text-align: center; padding: 10px">${White} - ${Black}</div>
+    <div id="search_term" style="text-align: center; padding: 10px">Copy search term</div>
   `
 
   puzzle_container.appendChild(boardContainer)
@@ -40,6 +81,7 @@ function renderBoard(puzzleInput) {
   function makePuzzleMove(chessboard) {
       setTimeout(() => {
         const move = puzzle.moves[moveIndex++]
+        console.log('making move: ', move)
         chess.move(move)
         chessboard.setPosition(chess.fen(), true)
         chessboard.enableMoveInput(inputHandler, puzzleColor)
@@ -53,7 +95,7 @@ function renderBoard(puzzleInput) {
       const selector = correct ? '#checkmark' : '#crossmark'
       const emoji = document.querySelector(`#${containerId} ${selector}`)
       emoji.style.left = boundingBox.x + 30;
-       var body = document.body;
+      var body = document.body;
       var docEl = document.documentElement;
       const scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
       emoji.style.top = boundingBox.y + 30 + scrollTop;
@@ -62,10 +104,10 @@ function renderBoard(puzzleInput) {
 
   function inputHandler(event) {
     // console.log("inputHandler", event)
-    if(event.type === INPUT_EVENT_TYPE.movingOverSquare) {
+    if (event.type === INPUT_EVENT_TYPE.movingOverSquare) {
       return // ignore this event
     }
-    if(event.type !== INPUT_EVENT_TYPE.moveInputFinished) {
+    if (event.type !== INPUT_EVENT_TYPE.moveInputFinished) {
       event.chessboard.removeLegalMovesMarkers()
     }
     if (event.type === INPUT_EVENT_TYPE.moveInputStarted) {
@@ -76,41 +118,68 @@ function renderBoard(puzzleInput) {
     } else if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
       const move = {from: event.squareFrom, to: event.squareTo, promotion: event.promotion}
 
+      const handleUserMove = (move, promotion) => { // update position, maybe castled and wait for animation has finished
+        if (promotion) {
+          console.log({move, promotion, puzzlemove: puzzle.moves[moveIndex]})
+        }
+        const correctPromotion = !promotion || (puzzle.moves[moveIndex].promotion && promotion === puzzle.moves[moveIndex].promotion)
+        if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to || !correctPromotion) {
+          drawCorrectnessMoveIndicator(move.to, false)
+          setTimeout(() => {
+            chess.undo()
+            document.querySelector(`#${containerId} #crossmark`).style.opacity = 0;
+            event.chessboard.setPosition(chess.fen(), true)
+            event.chessboard.enableMoveInput(inputHandler, puzzleColor)
+          }, 500)
+          // return
+        } else {
+          moveIndex++
+          drawCorrectnessMoveIndicator(move.to, true)
+          makePuzzleMove(event.chessboard)
+          if (puzzle.moves.length === moveIndex) {
+            const playersElem = document.querySelector('#players')
+            const searchElem = document.querySelector('#search_term')
+            const moveNumber = Number(puzzleInput.split(",")?.[0]?.split(' ')?.at(-1)) * 2
+            playersElem.innerHTML = `<a href="${Site}${moveNumber ? `#${moveNumber}`: ''}" target="_blank">${White} - ${Black}</a>`
+            searchElem.addEventListener('click', () => {
+              const searchTerm = `${White}.*\\n.*${Black}`
+              navigator.clipboard.writeText(searchTerm)
+                .then(() => {
+                  console.log(`${searchTerm} copied to clipboard`);
+                })
+                .catch(err => {
+                  console.error('Failed to copy: ', err);
+                });
+            }, {once: true})
+
+            congrats.style.display = 'block'
+            addToSolvedPuzzles(puzzleInput)
+            return
+          }
+        }
+      }
+
       const result = chess.move(move)
       if (result) {
         event.chessboard.state.moveInputProcess.then(() => { // wait for the move input process has finished
-          event.chessboard.setPosition(chess.fen(), true).then(() => { // update position, maybe castled and wait for animation has finished
-
-              if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to) {
-                drawCorrectnessMoveIndicator(move.to, false)
-                setTimeout(() => {
-                  chess.undo()
-                  document.querySelector(`#${containerId} #crossmark`).style.opacity = 0;
-                  event.chessboard.setPosition(chess.fen(), true)
-                  event.chessboard.enableMoveInput(inputHandler, puzzleColor)
-                }, 500)
-                // return
-              } else {
-                moveIndex++
-                drawCorrectnessMoveIndicator(move.to, true)
-                makePuzzleMove(event.chessboard)
-                if (puzzle.moves.length === moveIndex) {
-                  alert('Success!')
-                  return
-                }
-              }
-          })
+          event.chessboard.setPosition(chess.fen(), true).then(() => handleUserMove(move))
         })
       } else {
         // promotion?
           let possibleMoves = chess.moves({square: event.squareFrom, verbose: true})
+        console.log({possibleMoves, event})
+        window.chess = chess
         for (const possibleMove of possibleMoves) {
           if (possibleMove.promotion && possibleMove.to === event.squareTo) {
-            event.chessboard.showPromotionDialog(event.squareTo, COLOR.white, (result) => {
+            event.chessboard.showPromotionDialog(event.squareTo, chess.turn(), (result) => {
+              console.log({ result });
               if (result.type === PROMOTION_DIALOG_RESULT_TYPE.pieceSelected) {
-                chess.move({from: event.squareFrom, to: event.squareTo, promotion: result.piece.charAt(1)})
-                event.chessboard.setPosition(chess.fen(), true)
-                makePuzzleMove(event.chessboard)
+                const promotion = result.piece.charAt(1)
+                const move = {from: event.squareFrom, to: event.squareTo, promotion} 
+                chess.move(move)
+                event.chessboard.setPosition(chess.fen(), true).then(() => {
+                  handleUserMove(move, promotion)
+                })
               } else {
                 // promotion canceled
                 event.chessboard.enableMoveInput(inputHandler, puzzle)
@@ -135,25 +204,14 @@ function renderBoard(puzzleInput) {
   const puzzlePieces = puzzleInput.split(',')
   const puzzle = {
     fen: puzzlePieces[0],
-    moves: puzzlePieces[1].split(' ')
-    .map(move => {
-      const promotion = move.slice(4)
-      return {
-        from: move.slice(0, 2),
-        to: move.slice(2, 4),
-        ...(promotion ? {promotion} : {})
-      }
-    }),
+    moves: puzzlePieces[1].split(' ').map(getMoveThatThisOldChessjsVersionUnderstands),
   }
     // id: puzzlePieces[0],
   chess.load(puzzle.fen)
   const turn = chess.turn()
   const puzzleColor = turn === COLOR.black ? COLOR.white : COLOR.black
 
-  let board;
-  setTimeout(() => {
-    board = new Chessboard(document.getElementById(boardId), {
-      // position: chess.fen(),
+  const board = new Chessboard(document.getElementById(boardId), {
       position: puzzle.fen,
       assetsUrl: "./assets/",
       style: {borderType: BORDER_TYPE.none, pieces: {file: "pieces/staunty.svg"}, animationDuration: 300},
@@ -165,22 +223,50 @@ function renderBoard(puzzleInput) {
       ]
     })
     board.enableMoveInput(inputHandler, puzzleColor)
-  })
 
   setTimeout(() => {
     chess.move(puzzle.moves[0])
     board.movePiece(puzzle.moves[0].from, puzzle.moves[0].to, true)
     moveIndex++
   }, 1000)
+
+  show_solution.addEventListener('click', function() {
+    solution_el.innerHTML = '';
+    const [fen = '', solution = ''] = puzzles[puzzleIndex].Puzzle.split(',')
+    const solutionMoves = solution?.split(' ') ?? [] // excluding the first move because it is the move before the puzzle starts
+
+    solutionMoves.forEach((move, i) => {
+      const moveEl = document.createElement('span')
+      moveEl.innerText = move;
+      moveEl.style.cursor = 'pointer'
+      moveEl.style.paddingRight = '5px'
+      moveEl.addEventListener('click', () => {
+        const c = new Chess()
+        c.load(fen)
+        for (var j = 0; j <= i; j++) {
+          c.move(getMoveThatThisOldChessjsVersionUnderstands(solutionMoves[j]))
+        }
+        const newfen = c.fen().split(' ')[0]
+        
+        board.setPosition(newfen)
+      })
+      solution_el.appendChild(moveEl)
+    })
+  })
 }
 
-let puzzleIndex = 0
 const puzzles = await fetchPuzzles()
+const solvedPuzzles = getSolvedPuzzles()
+let puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles);
 
-const p = puzzles[0].Puzzle
+const p = puzzles[puzzleIndex]
 renderBoard(p)
 next_button.addEventListener('click', function() {
-  const p = puzzles[++puzzleIndex].Puzzle
+  puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles, puzzleIndex)
+  const p = puzzles[puzzleIndex]
   puzzle_container.innerHTML = ''
+  solution_el.innerHTML = ''
+  congrats.style.display = 'none'
   renderBoard(p)
 })
+ 

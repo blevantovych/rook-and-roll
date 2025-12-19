@@ -8,3 +8,7 @@ body {
   opacity: 0;
   user-select: none;
 }
+
+#congrats {
+  display: none;
+}

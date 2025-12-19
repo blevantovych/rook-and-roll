@@ -1,0 +1,25 @@
+{
+  "name": "puzzle_board",
+  "version": "1.0.0",
+  "description": "♟️ RockAndRoll RockAndRoll is a web application that allows users to solve chess puzzles and create their own. Whether you're sharpening your tactical skills or designing unique challenges for others, BlunderBuddy provides a simple, interactive, and engaging experience for chess enthusiasts of all levels.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "python3 -m http.server 8000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blevantovych/rook-and-roll.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blevantovych/rook-and-roll/issues"
+  },
+  "homepage": "https://github.com/blevantovych/rook-and-roll#readme",
+  "dependencies": {
+    "chess.js": "^1.4.0"
+  },
+  "devDependencies": {}
+}
