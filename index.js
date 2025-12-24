@@ -122,11 +122,12 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
       document.querySelector(correct ? '#crossmark' : '#checkmark').style.opacity = 0;
       const selector = correct ? '#checkmark' : '#crossmark'
       const emoji = document.querySelector(`#${containerId} ${selector}`)
-      emoji.style.left = boundingBox.x + 60;
+      const indicatorOffset = Math.round(boundingBox.width * 0.7) // 70% of total square;
+      emoji.style.left = boundingBox.x + indicatorOffset
       var body = document.body;
       var docEl = document.documentElement;
       const scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
-      emoji.style.top = boundingBox.y + 60 + scrollTop;
+      emoji.style.top = boundingBox.y + indicatorOffset + scrollTop;
       emoji.style.opacity = 1
   }
 
