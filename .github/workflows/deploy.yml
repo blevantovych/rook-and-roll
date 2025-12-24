@@ -4,6 +4,9 @@ on:
   push:
     branches: [ main ]
 
+env:
+  S3_BUCKET: s3://${{ secrets.BUCKET_NAME }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,7 +23,7 @@ jobs:
         aws-region: eu-central-1
 
     - name: Sync to S3
-      run: aws s3 sync . s3://${{ secrets.BUCKET_NAME }} --delete
+      run: aws s3 sync . "$S3_BUCKET" --delete
 
     - name: Create CloudFront Invalidation
       run: |
