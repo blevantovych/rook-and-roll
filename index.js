@@ -51,12 +51,13 @@ const getMoveThatThisOldChessjsVersionUnderstands = move => {
  *
  * @returns {{ Black: string, CombinedElo: string, DateTime: string, Event: string, Puzzle: string, Site: string, White: string }[]} user - The user object.
  */
-function fetchPuzzles() {
+async function fetchPuzzles() {
   // const eventName = 'Українська ліга 226 Team Battle';
   // const eventName = 'Українська ліга 243 Team Battle';
-  const eventName = 'Titled-Tuesday-Blitz-October-07-2025';
+  // const eventName = 'Titled-Tuesday-Blitz-October-07-2025';
+  const eventName = 'Winter Cup 100 000 UAH';
   // const eventName = 'Rated blitz game';
-  return fetch(`https://amxmp30651.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(eventName)}`)
+  return fetch(`https://ev0ntrlhjg.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(eventName)}`)
     .then(res => res.json())
 }
 
@@ -66,14 +67,41 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   const boardId = `board${boardIndex++}`
   const containerId = `${boardId}_container`
   boardContainer.style.marginBottom = '20px'
+  boardContainer.style.width = '100%'
   boardContainer.id = containerId
   boardContainer.innerHTML = `
-    <div id="${boardId}" style="width:400px"></div>
+    <div id="${boardId}" class="board" style="width:35vw"></div>
     <div id="checkmark">✅</div>
     <div id="crossmark">❌</div>
     <div id="players" style="text-align: center; padding: 10px">${White} - ${Black}</div>
-    <div id="search_term" style="text-align: center; padding: 10px">Copy search term</div>
+    <div id="search_term" style="text-align: center; padding: 10px; cursor: pointer;">Copy search term</div>
   `
+  setTimeout(() => {
+    const searchElem = document.querySelector('#search_term')
+    searchElem.addEventListener('click', () => {
+      const searchTerm = `${White}.*\\n.*${Black}`
+      navigator.clipboard.writeText(searchTerm)
+        .then(() => {
+          console.log(`${searchTerm} copied to clipboard`);
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+    }, {once: true})
+  }, 0)
+
+  const curFavorites = localStorage.getItem('favorites')
+  let favorites = curFavorites ? JSON.parse(curFavorites) : []
+  if (favorites.includes(puzzles[puzzleIndex].Puzzle)) {
+    add_to_fav.textContent = 'Remove from favorites'
+  } else {
+    add_to_fav.textContent = 'Add to favorites'
+  }
+  const new_add_to_fav = add_to_fav.cloneNode(true);
+  add_to_fav.replaceWith(new_add_to_fav);
+
+  const new_show_solution = show_solution.cloneNode(true);
+  show_solution.replaceWith(new_show_solution);
 
   puzzle_container.appendChild(boardContainer)
   let moveIndex = 0
@@ -94,11 +122,11 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
       document.querySelector(correct ? '#crossmark' : '#checkmark').style.opacity = 0;
       const selector = correct ? '#checkmark' : '#crossmark'
       const emoji = document.querySelector(`#${containerId} ${selector}`)
-      emoji.style.left = boundingBox.x + 30;
+      emoji.style.left = boundingBox.x + 60;
       var body = document.body;
       var docEl = document.documentElement;
       const scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
-      emoji.style.top = boundingBox.y + 30 + scrollTop;
+      emoji.style.top = boundingBox.y + 60 + scrollTop;
       emoji.style.opacity = 1
   }
 
@@ -124,6 +152,7 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
         }
         const correctPromotion = !promotion || (puzzle.moves[moveIndex].promotion && promotion === puzzle.moves[moveIndex].promotion)
         if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to || !correctPromotion) {
+          saveFailedAttemptInLocalStorage(puzzle.fen, move, promotion)
           drawCorrectnessMoveIndicator(move.to, false)
           setTimeout(() => {
             chess.undo()
@@ -138,19 +167,8 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
           makePuzzleMove(event.chessboard)
           if (puzzle.moves.length === moveIndex) {
             const playersElem = document.querySelector('#players')
-            const searchElem = document.querySelector('#search_term')
             const moveNumber = Number(puzzleInput.split(",")?.[0]?.split(' ')?.at(-1)) * 2
-            playersElem.innerHTML = `<a href="${Site}${moveNumber ? `#${moveNumber}`: ''}" target="_blank">${White} - ${Black}</a>`
-            searchElem.addEventListener('click', () => {
-              const searchTerm = `${White}.*\\n.*${Black}`
-              navigator.clipboard.writeText(searchTerm)
-                .then(() => {
-                  console.log(`${searchTerm} copied to clipboard`);
-                })
-                .catch(err => {
-                  console.error('Failed to copy: ', err);
-                });
-            }, {once: true})
+            playersElem.innerHTML = `<a href="${Site}${moveNumber ? `#${moveNumber}`: ''}" target="_blank">${puzzleIndex}. ${White} - ${Black}</a>`
 
             congrats.style.display = 'block'
             addToSolvedPuzzles(puzzleInput)
@@ -226,11 +244,31 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
 
   setTimeout(() => {
     chess.move(puzzle.moves[0])
-    board.movePiece(puzzle.moves[0].from, puzzle.moves[0].to, true)
+    // board.movePiece(puzzle.moves[0].from, puzzle.moves[0].to, true)
+    // setPosition is bettern in case the first move is a promotion (e.g. b2b1q b3e6 c8b7 c7c8q)
+    board.setPosition(chess.fen(), true)
     moveIndex++
   }, 1000)
 
+  console.log('adding event listener')
+  function favHandler() {
+    console.log('adding to fav')
+    const puzzle = puzzles[puzzleIndex].Puzzle
+    const curFavorites = localStorage.getItem('favorites')
+    let favorites = curFavorites ? JSON.parse(curFavorites) : []
+    if (favorites.includes(puzzle)) {
+      favorites = favorites.filter(fav => fav !== puzzle)
+      add_to_fav.textContent = 'Add to favorites'
+    } else {
+      favorites.push(puzzle)
+      add_to_fav.textContent = 'Remove from favorites'
+    }
+    localStorage.setItem('favorites', JSON.stringify(favorites))
+  }
+  add_to_fav.addEventListener('click', favHandler)
+
   show_solution.addEventListener('click', function() {
+    console.log('showing solution')
     solution_el.innerHTML = '';
     const [fen = '', solution = ''] = puzzles[puzzleIndex].Puzzle.split(',')
     const solutionMoves = solution?.split(' ') ?? [] // excluding the first move because it is the move before the puzzle starts
@@ -255,7 +293,13 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   })
 }
 
-const puzzles = await fetchPuzzles()
+let puzzles = [];
+try {
+  puzzles = await fetchPuzzles()
+} catch(e) {
+  console.error('couldn\'t fetch')
+  throw e
+}
 const solvedPuzzles = getSolvedPuzzles()
 let puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles);
 
@@ -270,3 +314,20 @@ next_button.addEventListener('click', function() {
   renderBoard(p)
 })
  
+function saveFailedAttemptInLocalStorage(fen, move, promotion) {
+  const localStorageFailedAttemptsKey = 'attempts'
+  let attempts = {}
+  try {
+    attempts = (localStorage.getItem(localStorageFailedAttemptsKey) && JSON.parse(localStorage.getItem(localStorageFailedAttemptsKey))) ?? {}
+    console.log({ attempts });
+  } catch(e) {}
+  const userFailedAttempt = `${move.from}${move.to}${promotion ?? ''}`
+  if (attempts[fen]) {
+    if (!attempts[fen].includes(userFailedAttempt)) {
+      attempts[fen] = [...attempts[fen], userFailedAttempt]
+    }
+  } else {
+    attempts[fen] = [userFailedAttempt]
+  }
+  localStorage.setItem(localStorageFailedAttemptsKey, JSON.stringify(attempts))
+}

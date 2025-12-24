@@ -12,3 +12,23 @@ body {
 #congrats {
   display: none;
 }
+  
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #333;
+    color: white;
+  }
+  a {
+    color: #66B2FF;
+  }
+}
+
+@media (max-width:640px) {
+ .board {
+   width: 100% !important;
+ }
+
+ #puzzle_container {
+   width: 100%;
+ }
+}
