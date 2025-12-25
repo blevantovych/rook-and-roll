@@ -20,8 +20,13 @@ let boardIndex = 0;
   * @returns {number} the index of the next puzzle to show
 */
 const getPuzzleIndex = (puzzles, solvedPuzzles, puzzleIndex = 0) => {
-  console.log({ puzzles: puzzles.slice(0, 100), solvedPuzzles, puzzleIndex });
- return puzzles.findIndex(({ Puzzle }, i) => i > puzzleIndex && !solvedPuzzles.includes(Puzzle))
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+  const start = urlParams.get('start');
+  if (!puzzleIndex) {
+    puzzleIndex = Number(start) - 1 || 0
+  }
+  return puzzles.findIndex(({ Puzzle }, i) => i > puzzleIndex && !solvedPuzzles.includes(Puzzle))
 }
 
 /**
@@ -109,7 +114,6 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   function makePuzzleMove(chessboard) {
       setTimeout(() => {
         const move = puzzle.moves[moveIndex++]
-        console.log('making move: ', move)
         chess.move(move)
         chessboard.setPosition(chess.fen(), true)
         chessboard.enableMoveInput(inputHandler, puzzleColor)
@@ -132,7 +136,6 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   }
 
   function inputHandler(event) {
-    // console.log("inputHandler", event)
     if (event.type === INPUT_EVENT_TYPE.movingOverSquare) {
       return // ignore this event
     }
@@ -148,9 +151,6 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
       const move = {from: event.squareFrom, to: event.squareTo, promotion: event.promotion}
 
       const handleUserMove = (move, promotion) => { // update position, maybe castled and wait for animation has finished
-        if (promotion) {
-          console.log({move, promotion, puzzlemove: puzzle.moves[moveIndex]})
-        }
         const correctPromotion = !promotion || (puzzle.moves[moveIndex].promotion && promotion === puzzle.moves[moveIndex].promotion)
         if (move.from !== puzzle.moves[moveIndex].from || move.to !== puzzle.moves[moveIndex].to || !correctPromotion) {
           saveFailedAttemptInLocalStorage(puzzle.fen, move, promotion)
@@ -185,13 +185,11 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
         })
       } else {
         // promotion?
-          let possibleMoves = chess.moves({square: event.squareFrom, verbose: true})
-        console.log({possibleMoves, event})
+        let possibleMoves = chess.moves({square: event.squareFrom, verbose: true})
         window.chess = chess
         for (const possibleMove of possibleMoves) {
           if (possibleMove.promotion && possibleMove.to === event.squareTo) {
             event.chessboard.showPromotionDialog(event.squareTo, chess.turn(), (result) => {
-              console.log({ result });
               if (result.type === PROMOTION_DIALOG_RESULT_TYPE.pieceSelected) {
                 const promotion = result.piece.charAt(1)
                 const move = {from: event.squareFrom, to: event.squareTo, promotion} 
@@ -251,9 +249,7 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
     moveIndex++
   }, 1000)
 
-  console.log('adding event listener')
   function favHandler() {
-    console.log('adding to fav')
     const puzzle = puzzles[puzzleIndex].Puzzle
     const curFavorites = localStorage.getItem('favorites')
     let favorites = curFavorites ? JSON.parse(curFavorites) : []
@@ -269,7 +265,6 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   add_to_fav.addEventListener('click', favHandler)
 
   show_solution.addEventListener('click', function() {
-    console.log('showing solution')
     solution_el.innerHTML = '';
     const [fen = '', solution = ''] = puzzles[puzzleIndex].Puzzle.split(',')
     const solutionMoves = solution?.split(' ') ?? [] // excluding the first move because it is the move before the puzzle starts
@@ -320,7 +315,6 @@ function saveFailedAttemptInLocalStorage(fen, move, promotion) {
   let attempts = {}
   try {
     attempts = (localStorage.getItem(localStorageFailedAttemptsKey) && JSON.parse(localStorage.getItem(localStorageFailedAttemptsKey))) ?? {}
-    console.log({ attempts });
   } catch(e) {}
   const userFailedAttempt = `${move.from}${move.to}${promotion ?? ''}`
   if (attempts[fen]) {
