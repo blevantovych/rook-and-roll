@@ -22,11 +22,8 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-central-1
 
-    - name: Bucket name
-      run: echo $S3_BUCKET
-
     - name: Sync to S3
-      run: aws s3 sync . "$S3_BUCKET" --delete
+      run: aws s3 sync . s3://generate-puzzles-ui-mresiayxbtddnlfvc --delete
 
     - name: Create CloudFront Invalidation
       run: |
