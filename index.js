@@ -23,7 +23,7 @@ const getPuzzleIndex = (puzzles, solvedPuzzles, puzzleIndex = 0) => {
   const queryString = window.location.search;
   const urlParams = new URLSearchParams(queryString);
   const start = urlParams.get('start');
-  if (!puzzleIndex) {
+  if (!puzzleIndex && start) {
     puzzleIndex = Number(start) - 1 || 0
   }
   return puzzles.findIndex(({ Puzzle }, i) => i > puzzleIndex && !solvedPuzzles.includes(Puzzle))
