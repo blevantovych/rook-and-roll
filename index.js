@@ -56,17 +56,19 @@ const getMoveThatThisOldChessjsVersionUnderstands = move => {
  *
  * @returns {{ Black: string, CombinedElo: string, DateTime: string, Event: string, Puzzle: string, Site: string, White: string }[]} user - The user object.
  */
-async function fetchPuzzles() {
+async function fetchPuzzles(tournament) {
   // const eventName = 'Українська ліга 226 Team Battle';
   // const eventName = 'Українська ліга 243 Team Battle';
   // const eventName = 'Titled-Tuesday-Blitz-October-07-2025';
-  const eventName = 'Winter Cup 100 000 UAH';
+  // const eventName = 'Winter Cup 100 000 UAH';
+  // const eventName = 'rated blitz game';
   // const eventName = 'Rated blitz game';
-  return fetch(`https://ev0ntrlhjg.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(eventName)}`)
+  // const eventName = 'World Rapid 2025';
+  return fetch(`https://ev0ntrlhjg.execute-api.eu-central-1.amazonaws.com/items?tournament=${encodeURIComponent(tournament)}`)
     .then(res => res.json())
 }
 
-function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
+function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleIndex) {
   const chess = new Chess()
   const boardContainer = document.createElement('div')
   const boardId = `board${boardIndex++}`
@@ -75,26 +77,12 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   boardContainer.style.width = '100%'
   boardContainer.id = containerId
   boardContainer.innerHTML = `
-    <div id="${boardId}" class="board" style="width:35vw"></div>
-    <div id="checkmark">✅</div>
-    <div id="crossmark">❌</div>
+    <div id="${boardId}" class="board" style="width:35vw" data-puzzle="${puzzleInput}" data-white="${White}" data-black="${Black}" data-site="${Site}"></div>
+    <div id="checkmark" style="pointer-events:none">✅</div>
+    <div id="crossmark" style="pointer-events:none">❌</div>
     <div id="players" style="text-align: center; padding: 10px">${White} - ${Black}</div>
     <div id="search_term" style="text-align: center; padding: 10px; cursor: pointer;">Copy search term</div>
   `
-  setTimeout(() => {
-    const searchElem = document.querySelector('#search_term')
-    searchElem.addEventListener('click', () => {
-      const searchTerm = `${White}.*\\n.*${Black}`
-      navigator.clipboard.writeText(searchTerm)
-        .then(() => {
-          console.log(`${searchTerm} copied to clipboard`);
-        })
-        .catch(err => {
-          console.error('Failed to copy: ', err);
-        });
-    }, {once: true})
-  }, 0)
-
   const curFavorites = localStorage.getItem('favorites')
   let favorites = curFavorites ? JSON.parse(curFavorites) : []
   if (favorites.includes(puzzles[puzzleIndex].Puzzle)) {
@@ -109,6 +97,21 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   show_solution.replaceWith(new_show_solution);
 
   puzzle_container.appendChild(boardContainer)
+
+  setTimeout(() => {
+    const searchElem = document.querySelector('#search_term')
+    searchElem.addEventListener('click', () => {
+      const searchTerm = `${White}.*\\n.*${Black}`
+      navigator.clipboard.writeText(searchTerm)
+        .then(() => {
+          console.log(`${searchTerm} copied to clipboard`);
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+    }, {once: true})
+  }, 0)
+
   let moveIndex = 0
 
   function makePuzzleMove(chessboard) {
@@ -289,27 +292,29 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}) {
   })
 }
 
-let puzzles = [];
-try {
-  puzzles = await fetchPuzzles()
-} catch(e) {
-  console.error('couldn\'t fetch')
-  throw e
-}
-const solvedPuzzles = getSolvedPuzzles()
-let puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles);
+async function renderPuzzlesFromTournament(tournament) {
+  let puzzles = [];
+  try {
+    puzzles = await fetchPuzzles(tournament)
+  } catch(e) {
+    console.error('couldn\'t fetch')
+    throw e
+  }
+  const solvedPuzzles = getSolvedPuzzles()
+  let puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles);
 
-const p = puzzles[puzzleIndex]
-renderBoard(p)
-next_button.addEventListener('click', function() {
-  puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles, puzzleIndex)
   const p = puzzles[puzzleIndex]
-  puzzle_container.innerHTML = ''
-  solution_el.innerHTML = ''
-  congrats.style.display = 'none'
-  renderBoard(p)
-})
- 
+  renderBoard(p, puzzles, puzzleIndex)
+  next_button.addEventListener('click', function() {
+    puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles, puzzleIndex)
+    const p = puzzles[puzzleIndex]
+    puzzle_container.innerHTML = ''
+    solution_el.innerHTML = ''
+    congrats.style.display = 'none'
+    renderBoard(p, puzzles, puzzleIndex)
+  })
+}
+
 function saveFailedAttemptInLocalStorage(fen, move, promotion) {
   const localStorageFailedAttemptsKey = 'attempts'
   let attempts = {}
@@ -326,3 +331,10 @@ function saveFailedAttemptInLocalStorage(fen, move, promotion) {
   }
   localStorage.setItem(localStorageFailedAttemptsKey, JSON.stringify(attempts))
 }
+
+document.querySelector('#tournament-select').addEventListener('change', (event) => {
+  puzzle_container.innerHTML = ''
+  renderPuzzlesFromTournament(event.target.value);
+})
+
+renderPuzzlesFromTournament(document.querySelector('#tournament-select').value)
