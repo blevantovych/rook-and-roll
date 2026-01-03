@@ -68,7 +68,7 @@ async function fetchPuzzles(tournament) {
     .then(res => res.json())
 }
 
-function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleIndex) {
+function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleIndex, tournament) {
   const chess = new Chess()
   const boardContainer = document.createElement('div')
   const boardId = `board${boardIndex++}`
@@ -77,15 +77,15 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleI
   boardContainer.style.width = '100%'
   boardContainer.id = containerId
   boardContainer.innerHTML = `
-    <div id="${boardId}" class="board" style="width:35vw" data-puzzle="${puzzleInput}" data-white="${White}" data-black="${Black}" data-site="${Site}"></div>
+    <div id="${boardId}" class="board" style="width:32vw" data-puzzle="${puzzleInput}" data-white="${White}" data-black="${Black}" data-site="${Site}"></div>
     <div id="checkmark" style="pointer-events:none">✅</div>
     <div id="crossmark" style="pointer-events:none">❌</div>
     <div id="players" style="text-align: center; padding: 10px">${White} - ${Black}</div>
     <div id="search_term" style="text-align: center; padding: 10px; cursor: pointer;">Copy search term</div>
   `
   const curFavorites = localStorage.getItem('favorites')
-  let favorites = curFavorites ? JSON.parse(curFavorites) : []
-  if (favorites.includes(puzzles[puzzleIndex].Puzzle)) {
+  let favorites = curFavorites ? JSON.parse(curFavorites) : {}
+  if (favorites[tournament]?.includes(puzzles[puzzleIndex].Puzzle)) {
     add_to_fav.textContent = 'Remove from favorites'
   } else {
     add_to_fav.textContent = 'Add to favorites'
@@ -172,7 +172,8 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleI
           if (puzzle.moves.length === moveIndex) {
             const playersElem = document.querySelector('#players')
             const moveNumber = Number(puzzleInput.split(",")?.[0]?.split(' ')?.at(-1)) * 2
-            playersElem.innerHTML = `<a href="${Site}${moveNumber ? `#${moveNumber}`: ''}" target="_blank">${puzzleIndex}. ${White} - ${Black}</a>`
+            const link = getGameLink(Site, moveNumber, puzzle)
+            playersElem.innerHTML = `<a href="${link}" target="_blank">${puzzleIndex}. ${White} - ${Black}</a>`
 
             congrats.style.display = 'block'
             addToSolvedPuzzles(puzzleInput)
@@ -255,7 +256,8 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleI
   function favHandler() {
     const puzzle = puzzles[puzzleIndex].Puzzle
     const curFavorites = localStorage.getItem('favorites')
-    let favorites = curFavorites ? JSON.parse(curFavorites) : []
+    const allFavorites = curFavorites ? JSON.parse(curFavorites) : {}
+    let favorites = curFavorites ? (JSON.parse(curFavorites)[tournament] ?? []) : []
     if (favorites.includes(puzzle)) {
       favorites = favorites.filter(fav => fav !== puzzle)
       add_to_fav.textContent = 'Add to favorites'
@@ -263,7 +265,8 @@ function renderBoard({Puzzle: puzzleInput, White, Black, Site}, puzzles, puzzleI
       favorites.push(puzzle)
       add_to_fav.textContent = 'Remove from favorites'
     }
-    localStorage.setItem('favorites', JSON.stringify(favorites))
+    allFavorites[tournament] = favorites
+    localStorage.setItem('favorites', JSON.stringify(allFavorites))
   }
   add_to_fav.addEventListener('click', favHandler)
 
@@ -304,14 +307,14 @@ async function renderPuzzlesFromTournament(tournament) {
   let puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles);
 
   const p = puzzles[puzzleIndex]
-  renderBoard(p, puzzles, puzzleIndex)
+  renderBoard(p, puzzles, puzzleIndex, tournament)
   next_button.addEventListener('click', function() {
     puzzleIndex = getPuzzleIndex(puzzles, solvedPuzzles, puzzleIndex)
     const p = puzzles[puzzleIndex]
     puzzle_container.innerHTML = ''
     solution_el.innerHTML = ''
     congrats.style.display = 'none'
-    renderBoard(p, puzzles, puzzleIndex)
+    renderBoard(p, puzzles, puzzleIndex, tournament)
   })
 }
 
@@ -338,3 +341,22 @@ document.querySelector('#tournament-select').addEventListener('change', (event) 
 })
 
 renderPuzzlesFromTournament(document.querySelector('#tournament-select').value)
+
+/**
+  * @param site {string}
+  * @param moveNumber {number}
+  * @param {{fen: string, moves: Array<string>}} puzzle Puzzle with fen and moves
+  * @returns {string} link to the game or lichess analysis
+*/
+function getGameLink(site, moveNumber, puzzle) {
+  if (site.includes('lichess.org')) {
+    const link = `${site}${moveNumber ? `#${moveNumber}`: ''}`
+    return link
+  }
+  const chess = new Chess()
+  chess.load(puzzle.fen)
+  chess.move(puzzle.moves[0])
+
+  const color = puzzle.fen.split(' ')?.[1] === 'w' ? 'black' : 'white' 
+  return `https://lichess.org/analysis/${chess.fen().replace(' ', '_')}?color=${color}`
+}
